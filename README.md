@@ -30,6 +30,76 @@ flowchart LR
 
 ---
 
+## 🔄 Fluxos Específicos
+
+### 1️⃣ GET /companies (Listagem com Cache)
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant A as API
+    participant R as Redis Cache
+    participant P as PostgreSQL
+
+    F->>A: GET /companies?page=1
+    A->>R: Busca cache
+    R-->>A: Tem cache?
+    
+    alt Cache HIT
+        A-->>F: Retorna em ~5ms
+    else Cache MISS
+        A->>P: Busca dados
+        P-->>A: Retorna empresas
+        A->>R: Salva no cache (5min)
+        A-->>F: Retorna dados
+    end
+```
+
+---
+
+### 2️⃣ POST /companies (Criação com Fila)
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant A as API
+    participant P as PostgreSQL
+    participant Q as Fila Redis
+    participant W as Worker
+    participant E as E-mail
+
+    F->>A: POST /companies
+    A->>P: Salva empresa + log PENDING
+    A->>Q: Adiciona job na fila
+    A-->>F: Retorna 201 (criado)
+    
+    note right of F: Frontend recebe<br/>imediatamente!
+    
+    par Processamento Assíncrono
+        W->>Q: Pega job da fila
+        W->>E: Envia e-mail
+        E-->>W: Enviou?
+        W->>P: Atualiza log (SENT/FAILED)
+    end
+```
+
+---
+
+### 3️⃣ Cron Job (Recuperação de Falhas)
+
+```mermaid
+graph LR
+    Start[⏰ A cada 1 minuto] --> Scan[Varre logs PENDING<br/>mais de 30s]
+    Scan --> Requeue[Re-enfileira jobs]
+    Requeue --> Check{Falhou 3x?}
+    Check -->|Sim| Fail[Marca FAILED_PERMANENTLY]
+    Check -->|Não| Retry[Tenta novamente]
+    Fail --> End
+    Retry --> End
+```
+
+---
+
 ## Arquitetura e Decisões Técnicas
 
 O sistema foi projetado para ser performático e desacoplado, utilizando padrões de mercado para garantir a integridade dos dados e a melhor experiência do usuário.
