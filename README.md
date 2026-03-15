@@ -5,6 +5,139 @@ Esta aplicação web foi desenvolvida como solução para o desafio de Desenvolv
 
 O foco principal foi criar uma arquitetura robusta, escalável e que demonstra conhecimento em sistemas distribuídos e resilientes.
 
+---
+
+## 📊 Fluxo da Arquitetura
+
+```mermaid
+flowchart TD
+    subgraph Frontend["🎨 Frontend (React + Vite)"]
+        UI[Componentes UI]
+        Hooks[Custom Hooks<br/>useCompanies/useCompanyForm]
+        API[Service HTTP]
+    end
+
+    subgraph Backend["⚙️ Backend (NestJS)"]
+        Controller[Companies Controller]
+        Service[Companies Service]
+        Cache[🔥 Cache Service<br/>Redis/ioredis]
+        Queue[Queue Service<br/>BullMQ]
+        Email[Email Service<br/>Nodemailer]
+        Reconcile[⏰ Reconciliation Service<br/>Cron Job]
+        Prisma[Prisma ORM]
+    end
+
+    subgraph Data["💾 Dados"]
+        RedisCache[(🔴 Redis Cache<br/>5 min TTL)]
+        RedisQueue[(🔴 Redis Queue<br/>Email Jobs)]
+        Postgres[(🐘 PostgreSQL<br/>Empresas/Logs)]
+    end
+
+    subgraph External["📧 Externo"]
+        SMTP[SMTP Server<br/>Nodemailer]
+    end
+
+    UI --> Hooks
+    Hooks --> API
+    API --> Controller
+
+    Controller --> Service
+    Service --> Cache
+    Cache -->|Cache Hit| RedisCache
+    Cache -->|Cache Miss/Write| Postgres
+    Service -->|Invalida Cache| Cache
+    Service -->|Cria Empresa| Postgres
+    Service -->|Enfileira Job| Queue
+    Queue --> RedisQueue
+
+    RedisQueue -->|Processa| Email
+    Email -->|Envia| SMTP
+    Email -->|Atualiza Log| Postgres
+
+    Reconcile -->|Varre a cada 1min| Postgres
+    Reconcile -->|Recovery Jobs| Queue
+
+    style RedisCache fill:#ff6b6b
+    style RedisQueue fill:#ff8787
+    style Postgres fill:#4dabf7
+    style Cache fill:#ffd43b
+    style Queue fill:#ffd43b
+```
+
+---
+
+## 🔄 Detalhamento dos Fluxos
+
+### 1. Listagem de Empresas com Cache
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant C as Cache Service
+    participant R as Redis
+    participant P as PostgreSQL
+
+    F->>C: GET /companies?page=1&search=X
+    C->>R: GET company_management:companies:list:page:1:search:X
+    
+    alt Cache Hit
+        R-->>C: Dados em cache
+        C-->>F: Resposta rápida (~5ms)
+    else Cache Miss
+        R-->>C: null
+        C->>P: SELECT companies + COUNT
+        P-->>C: Dados + Total
+        C->>R: SETEX key 300s data
+        C-->>F: Resposta completa
+    end
+```
+
+### 2. Criação de Empresa com Invalidação
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant S as Companies Service
+    participant DB as PostgreSQL
+    participant Q as Redis Queue
+    participant C as Cache Service
+
+    F->>S: POST /companies (CNPJ, Nome)
+    
+    rect rgb(255, 240, 200)
+        note right of S: Transação Atômica
+        S->>DB: BEGIN TRANSACTION
+        S->>DB: INSERT company
+        S->>DB: INSERT notification (PENDING)
+        S->>DB: COMMIT
+    end
+    
+    S->>Q: ADD email-queue job
+    S->>C: invalidateCompaniesCache()
+    C->>C: DEL companies:list:*
+    S-->>F: 201 Created
+    
+    note right of F: Frontend recebe<br/>imediatamente!
+```
+
+### 3. Processamento Assíncrono de E-mail
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: Cria empresa
+    PENDING --> PROCESSING: Worker pega job
+    PROCESSING --> SENT: Sucesso (SMTP OK)
+    PROCESSING --> PENDING: Falha temporária (retry)
+    PENDING --> FAILED_PERMANENTLY: 3 tentativas falharam
+    
+    note right of FAILED_PERMANENTLY
+        Cron Job de Conciliação
+        varre a cada 1 minuto
+    end note
+```
+
+---
+
 ## Arquitetura e Decisões Técnicas
 
 O sistema foi projetado para ser performático e desacoplado, utilizando padrões de mercado para garantir a integridade dos dados e a melhor experiência do usuário.

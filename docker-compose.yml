@@ -31,6 +31,9 @@ services:
       PRISMA_CLIENT_ENGINE_TYPE: binary
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_DB: 0
+      CACHE_TTL: 300
+      CACHE_MAX_ITEMS: 1000
     depends_on:
       db:
         condition: service_healthy

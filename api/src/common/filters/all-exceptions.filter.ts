@@ -28,15 +28,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getResponse()
         : 'Erro interno no servidor';
 
+    const extractErrorMessage = (msg: unknown): string => {
+      if (typeof msg === 'string') return msg;
+      if (typeof msg === 'object' && msg !== null) {
+        return (
+          ((msg as Record<string, unknown>).message as string) ||
+          JSON.stringify(msg)
+        );
+      }
+      return String(msg);
+    };
+
+    const errorMessage = extractErrorMessage(message);
+
     const responseBody = {
       statusCode: httpStatus,
       timestamp: new Date().toISOString(),
       path: httpAdapter.getRequestUrl(ctx.getRequest()),
-      message:
-        typeof message === 'object'
-          ? (message as any).message || message
-          : message,
-    };
+      message: errorMessage,
+    } as const;
 
     this.logger.error(
       `HTTP Status: ${httpStatus} Error: ${JSON.stringify(responseBody)}`,

@@ -3,6 +3,7 @@ import { CompaniesService } from './companies.service';
 import { PrismaService } from '../prisma.service';
 import { I_MESSAGE_QUEUE_SERVICE } from '../queue/interfaces/message-queue.interface';
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { CacheService, CACHE_REDIS_CLIENT } from '../cache/cache.service';
 
 describe('CompaniesService', () => {
   let service: CompaniesService;
@@ -22,21 +23,57 @@ describe('CompaniesService', () => {
       update: jest.fn(),
       create: jest.fn(),
     },
-    $transaction: jest.fn((callback) => callback(mockPrismaService)),
+    $transaction: jest.fn(),
   };
-
 
   const mockQueueService = {
     addEmailJob: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockRedisClient = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue('OK'),
+    setex: jest.fn().mockResolvedValue('OK'),
+    del: jest.fn().mockResolvedValue(1),
+    keys: jest.fn().mockResolvedValue([]),
+    setnx: jest.fn().mockResolvedValue(1),
+    expire: jest.fn().mockResolvedValue(1),
+  };
+
+  const mockCacheService = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    del: jest.fn().mockResolvedValue(undefined),
+    delByPattern: jest.fn().mockResolvedValue(undefined),
+    getOrSet: jest.fn().mockImplementation(async (key, fetchFn) => fetchFn()),
+    invalidateCompaniesCache: jest.fn().mockResolvedValue(undefined),
+    getCompaniesListKey: jest
+      .fn()
+      .mockImplementation(
+        (page, search) =>
+          `companies:list:page:${page}:search:${search || 'all'}`,
+      ),
+    getCompanyByIdKey: jest
+      .fn()
+      .mockImplementation((id) => `companies:id:${id}`),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    // Setup $transaction para executar o callback com o mock
+    mockPrismaService.$transaction.mockImplementation(
+      (callback: (tx: typeof mockPrismaService) => Promise<any>) =>
+        callback(mockPrismaService),
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompaniesService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: I_MESSAGE_QUEUE_SERVICE, useValue: mockQueueService },
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: CACHE_REDIS_CLIENT, useValue: mockRedisClient },
       ],
     }).compile();
 
@@ -92,9 +129,13 @@ describe('CompaniesService', () => {
 
   describe('findOne', () => {
     it('deve retornar empresa', async () => {
-      mockPrismaService.company.findUnique.mockResolvedValue({ id: '1' });
+      mockPrismaService.company.findUnique.mockResolvedValue({
+        id: '1',
+        name: 'Test',
+        cnpj: '123',
+      });
       const res = await service.findOne('1');
-      expect(res.id).toBe('1');
+      expect((res as { id: string }).id).toBe('1');
     });
   });
 

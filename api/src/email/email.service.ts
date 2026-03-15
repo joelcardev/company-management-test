@@ -78,14 +78,16 @@ export class EmailService implements OnModuleInit {
 
       await this.updateStatus(notificationId, NotificationStatus.SENT);
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Erro no envio (ID: ${notificationId}): ${error.message}`,
+        `Erro no envio (ID: ${notificationId}): ${errorMessage}`,
       );
       const status =
         updatedLog.attempts >= this.MAX_ATTEMPTS
           ? NotificationStatus.FAILED_PERMANENTLY
           : NotificationStatus.FAILED;
-      await this.updateStatus(notificationId, status, error.message);
+      await this.updateStatus(notificationId, status, errorMessage);
       throw error;
     }
   }

@@ -39,9 +39,10 @@ export class EmailProcessor {
         `E-mail enviado com sucesso para a empresa: ${companyName}`,
       );
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Falha ao processar e-mail para ${companyName}:`,
-        error,
+        `Falha ao processar e-mail para ${companyName}: ${errorMessage}`,
       );
       throw error; // Permite que o Bull tente novamente (retry)
     }
