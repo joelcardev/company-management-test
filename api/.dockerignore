@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+dist
+.env
+.git
+.gitignore
+README.md
+Dockerfile
+docker-compose.yml
+# Exclude coverage and tests to keep build light if not needed for production build
+coverage
+test

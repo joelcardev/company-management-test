@@ -1,0 +1,86 @@
+services:
+  # 1. Banco de Dados PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: company_db
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: company_management
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d company_management"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Backend NestJS
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: company_api
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://root:rootpassword@db:5432/company_management?schema=public"
+      PRISMA_CLI_QUERY_ENGINE_TYPE: binary
+      PRISMA_CLIENT_ENGINE_TYPE: binary
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./api:/usr/src/app
+      - /usr/src/app/node_modules
+
+  # 3. Frontend React + Vite
+  front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: company_front
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - api
+    volumes:
+      - ./front:/usr/src/app
+      - /usr/src/app/node_modules
+
+  # 4. Database Admin UI (pgAdmin)
+  redis:
+    image: redis:7-alpine
+    container_name: company_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: company_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

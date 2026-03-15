@@ -1,0 +1,43 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id            String         @id @default(uuid())
+  name          String
+  cnpj          String         @unique
+  tradeName     String?        @map("trade_name")
+  address       String
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  notifications Notification[]
+
+  @@map("companies")
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  companyId String             @map("company_id")
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type      String
+  status    NotificationStatus
+  sentTo    String             @map("sent_to")
+  attempts  Int                @default(0)
+  error     String?
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  FAILED_PERMANENTLY
+}
