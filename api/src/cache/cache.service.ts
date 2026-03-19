@@ -1,9 +1,8 @@
-import { Injectable, Logger, Inject, Global } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import Redis from 'ioredis';
 
 export const CACHE_REDIS_CLIENT = 'CACHE_REDIS_CLIENT';
 
-@Global()
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);

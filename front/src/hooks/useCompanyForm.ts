@@ -15,7 +15,19 @@ function maskCnpj(value: string): string {
   return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
 }
 
-export function useCompanyForm(id?: string) {
+interface UseCompanyFormReturn {
+  isEditing: boolean;
+  formData: CompanyDTO;
+  loading: boolean;
+  submitting: boolean;
+  error: string;
+  success: string;
+  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSubmit: (e: React.FormEvent) => Promise<void>;
+  clearSuccess: () => void;
+}
+
+export function useCompanyForm(id?: string): UseCompanyFormReturn {
   const navigate = useNavigate();
   const isEditing = !!id;
 
@@ -55,10 +67,14 @@ export function useCompanyForm(id?: string) {
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ 
-      ...prev, 
-      [name]: name === 'cnpj' ? maskCnpj(value) : value 
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === 'cnpj' ? maskCnpj(value) : value
     }));
+  }, []);
+
+  const clearSuccess = useCallback(() => {
+    setSuccess('');
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -81,11 +97,13 @@ export function useCompanyForm(id?: string) {
         setSuccess('Empresa cadastrada com sucesso!');
       }
 
-      setTimeout(() => navigate('/'), 1200);
+      // Aguarda o usuário ver a mensagem de sucesso antes de navegar
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
-    } finally {
-      setSubmitting(false);
+      setSubmitting(false); // Só remove o loading se houve erro
     }
   }, [formData, id, isEditing, navigate]);
 
@@ -97,6 +115,7 @@ export function useCompanyForm(id?: string) {
     error,
     success,
     handleChange,
-    handleSubmit
+    handleSubmit,
+    clearSuccess,
   };
 }

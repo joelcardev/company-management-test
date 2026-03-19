@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -54,8 +54,24 @@ export const CompanyList = () => {
     handleRetryNotification
   } = useCompanies();
 
+  const hasLoadedInitial = useRef(false);
+
+  // Carrega dados iniciais (apenas uma vez no mount)
   useEffect(() => {
-    loadCompanies();
+    if (!hasLoadedInitial.current) {
+      hasLoadedInitial.current = true;
+      loadCompanies();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Recarrega a lista quando voltar de outra tela (ex: após criar/editar)
+  useEffect(() => {
+    const handleFocus = () => {
+      loadCompanies();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, [loadCompanies]);
 
   const getStatusDisplay = (status: NotificationStatus) => {

@@ -23,20 +23,23 @@ export function useCompanies() {
     isOpen: false, id: '', name: '', isLoading: false
   });
 
-  const loadCompanies = useCallback(async (currentPage: number = page, currentSearch: string = searchTerm) => {
+  const loadCompanies = useCallback(async (currentPage: number = 1, currentSearch: string = '') => {
+    console.log('[useCompanies] loadCompanies called:', { page: currentPage, search: currentSearch });
     try {
       setLoading(true);
       const res = await api.getCompanies(currentPage, limit, currentSearch);
+      console.log('[useCompanies] Companies loaded:', res.data.length, 'items');
       setCompanies(res.data);
       setTotalCount(res.total);
       setTotalPages(res.totalPages);
       setPage(res.page);
+      setSearchTerm(currentSearch);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar empresas');
     } finally {
       setLoading(false);
     }
-  }, [limit, page, searchTerm]);
+  }, [limit]);
 
   // Handle Search Debounce
   useEffect(() => {
@@ -74,7 +77,7 @@ export function useCompanies() {
     } finally {
       setDeleteModal({ isOpen: false, id: '', name: '', isLoading: false });
     }
-  }, [deleteModal, showToast, loadCompanies, page, searchTerm]);
+  }, [deleteModal, showToast, loadCompanies]);
 
   const fetchLogs = useCallback(async (id: string, name: string) => {
     try {
@@ -92,23 +95,35 @@ export function useCompanies() {
     setSelectedLogs(null);
   }, []);
 
-  // Smart Polling para logs PENDING
+  // Smart Polling para logs PENDING (apenas quando modal está aberto)
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    
+
     if (selectedLogs && selectedLogs.logs.some(l => l.status === NotificationStatus.PENDING)) {
+      // Polling de 5s para não sobrecarregar a API
       interval = setInterval(async () => {
-        // Encontra o ID da empresa (um pouco hacky mas funciona dado o estado atual)
         const company = companies.find(c => c.name === selectedLogs.name);
         if (company) {
-          const updatedLogs = await api.getCompanyLogs(company.id);
-          setSelectedLogs(prev => prev ? { ...prev, logs: updatedLogs } : null);
+          try {
+            const updatedLogs = await api.getCompanyLogs(company.id);
+            setSelectedLogs(prev => prev ? { ...prev, logs: updatedLogs } : null);
+            
+            // Para polling se não houver mais logs pending
+            const hasPending = updatedLogs.some(l => l.status === NotificationStatus.PENDING);
+            if (!hasPending) {
+              clearInterval(interval);
+            }
+          } catch (err) {
+            console.error('[useCompanies] Falha ao atualizar logs:', err);
+          }
         }
-      }, 3000);
+      }, 5000);
     }
-    
-    return () => clearInterval(interval);
-  }, [selectedLogs]); // Removed 'companies' from dependency array as selectedLogs now contains 'id'
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [selectedLogs, companies]);
 
   const handleRetryNotification = useCallback(async (notificationId: string) => {
     if (!selectedLogs) return;

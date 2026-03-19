@@ -54,6 +54,7 @@ export const api = {
       limit: limit.toString(),
       search
     }).toString();
+    console.log('[API] GET /companies?', query);
     const res = await fetch(`${API_URL}/companies?${query}`);
     return handleResponse<PaginatedResponse<Company>>(res);
   },

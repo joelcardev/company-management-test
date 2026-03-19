@@ -17,5 +17,6 @@ RUN npx prisma generate
 
 EXPOSE 3000
 
-# Generate Prisma client and push schema at runtime
+# Development: Generate client and sync schema, then start dev server
+# Production: Should use 'npx prisma migrate deploy' instead
 CMD ["sh", "-c", "npx prisma generate && npx prisma db push && npm run start:dev"]

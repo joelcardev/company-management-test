@@ -15,12 +15,13 @@ export class EmailService implements OnModuleInit {
     try {
       const useEthereal = !process.env.EMAIL_USER;
       if (useEthereal) {
+        // Timeout de 2s para não travar o startup da API
         const testAccount = (await Promise.race([
           nodemailer.createTestAccount(),
           new Promise((_, reject) =>
             setTimeout(
               () => reject(new Error('Timeout ao criar conta Ethereal')),
-              5000,
+              2000, // ✅ Reduzido de 5000ms para 2000ms
             ),
           ),
         ])) as nodemailer.TestAccount;
@@ -52,7 +53,8 @@ export class EmailService implements OnModuleInit {
   ) {
     const recipients = process.env.EMAIL_RECIPIENTS || 'admin@sistema.com';
 
-    const updatedLog = await (this.prisma as any).notification.update({
+    // Acessa o model notification através do PrismaService
+    const updatedLog = await this.prisma.notification.update({
       where: { id: notificationId },
       data: { attempts: { increment: 1 } },
     });
@@ -98,7 +100,7 @@ export class EmailService implements OnModuleInit {
     error?: string,
   ) {
     try {
-      await (this.prisma as any).notification.update({
+      await this.prisma.notification.update({
         where: { id },
         data: { status, error },
       });

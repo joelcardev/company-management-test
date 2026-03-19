@@ -5,7 +5,6 @@ import { I_MESSAGE_QUEUE_SERVICE } from './interfaces/message-queue.interface';
 import { EmailProcessor } from './email.processor';
 import { EmailModule } from '../email/email.module';
 import { ReconciliationService } from './reconciliation.service';
-import { PrismaService } from '../prisma.service';
 
 @Module({
   imports: [
@@ -21,7 +20,7 @@ import { PrismaService } from '../prisma.service';
     },
     EmailProcessor,
     ReconciliationService,
-    PrismaService, // <--- Adicionado aqui
+    // PrismaService é @Global(), disponível automaticamente
   ],
   exports: [I_MESSAGE_QUEUE_SERVICE],
 })
